@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PropType } from 'vue'
 import { computed, ref, toRefs, watch } from 'vue'
-import { NButton } from 'naive-ui'
+import { NBreadcrumb, NBreadcrumbItem, NButton } from 'naive-ui'
 
 import type { DrawerItem, ShowEvents } from './types'
 import { BEFORE_SHOW_EVENTS, DRAWER_ITEMS, IS_DRAWER_INNER } from './constants'
@@ -36,24 +36,26 @@ watch(lastItem, (v) => {
 </script>
 
 <template>
-  <div class="drawer-container bg-yellow-600">
+  <div class="drawer-container shadow-2xl bg-yellow-600 fixed top-0 right-0 w-2/3 h-full">
     <n-button type="primary" @click="() => lastItem?.close?.()">
       pop
     </n-button>
     当前激活抽屉：{{ lastItem.name }}
-    <div class="flex">
-      <div
-        v-for="n in props.items" :key="n.uid" class="p-2  " :class="{
-          'text-gray-500': !n.record
-        }"
-        @click="n.toActive"
-      >
-        {{ n.name }}({{ n.uid }})
-      </div>
+    <n-breadcrumb class="bg-red-300 p-2 overflow-auto">
+      <n-breadcrumb-item v-for="n in props.items" :key="n.uid" @click="n.toActive">
+        <span
+          :class="{
+            'text-gray-500': !n.record,
+            'text-blue-600': n.record,
+          }"
+        >{{ n.name }}</span>
+      </n-breadcrumb-item>
+    </n-breadcrumb>
+    <div class="bg-green-400 pt-2">
+      <keep-alive :exclude="excludeArr">
+        <component :is="lastItem.component" :key="lastItem.uid" />
+      </keep-alive>
     </div>
-    <keep-alive :exclude="excludeArr">
-      <component :is="lastItem.component" :key="lastItem.uid" />
-    </keep-alive>
   </div>
 </template>
 
