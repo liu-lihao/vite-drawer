@@ -1,0 +1,5 @@
+export const IS_DRAWER_INNER = Symbol('isDrawerInner')
+export const DRAWER_ITEMS = Symbol('drawerItems')
+export const BASE_SHOW_EVENTS = Symbol('baseShowEvents')
+export const ITEM_SHOW_EVENTS = Symbol('itemShowEvents')
+export const BEFORE_SHOW_EVENTS = Symbol('beforeShowEvents')
