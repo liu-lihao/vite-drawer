@@ -27,26 +27,31 @@ const lastItem = computed(() => props.items.slice(-1)[0] || {})
 const excludeArr = ref<string[]>([])
 
 watch(lastItem, (v) => {
-  v?.registerRemoveRecord?.(() => {
-    excludeArr.value.push(v?.itemCmpName)
+  v.registerRemoveCache(() => {
+    excludeArr.value.push(v.cacheName)
   })
-  v?.onActive?.()
+  // 从 excludeArr 中移除，避免被清理缓存后的组件无法再次缓存
+  const index = excludeArr.value.indexOf(v?.cacheName)
+  if (index > -1) {
+    excludeArr.value.splice(index, 1)
+  }
+  v.onActive()
 })
 
 </script>
 
 <template>
   <div class="drawer-container shadow-2xl bg-yellow-600 fixed top-0 right-0 w-2/3 h-full">
-    <n-button type="primary" @click="() => lastItem?.close?.()">
-      pop
+    <n-button round type="info" size="tiny" @click="() => lastItem?.close?.()">
+      返回上一级
     </n-button>
     当前激活抽屉：{{ lastItem.name }}
     <n-breadcrumb class="bg-red-300 p-2 overflow-auto">
       <n-breadcrumb-item v-for="n in props.items" :key="n.uid" @click="n.toActive">
         <span
           :class="{
-            'text-gray-500': !n.record,
-            'text-blue-600': n.record,
+            'text-gray-500': !n.cache,
+            'text-blue-600': n.cache,
           }"
         >{{ n.name }}</span>
       </n-breadcrumb-item>

@@ -16,13 +16,17 @@ setTimeout(() => {
 </script>
 
 <template>
-  {{ data }}
-  <n-button type="primary" @click="orderDetailDrawer.open({ props: { orderId: new Date().toLocaleString() } })">
-    orderDetailDrawer
-  </n-button>
-  <n-button type="primary" @click="customerDetailDrawer.open()">
-    customerDetailDrawer
-  </n-button>
+  <div class="p-5">
+    <div class="p-5">
+      {{ data }}
+    </div>
+    <n-button type="primary" @click="orderDetailDrawer.open({ props: { orderId: new Date().toLocaleString() } })">
+      订单详情抽屉
+    </n-button>
+    <n-button class="ml-5" type="primary" @click="customerDetailDrawer.open()">
+      客户详情抽屉
+    </n-button>
+  </div>
 </template>
 
 <style lang="scss"></style>

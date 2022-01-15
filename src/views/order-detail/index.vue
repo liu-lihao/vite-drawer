@@ -21,7 +21,7 @@ const showProductList = ref(false)
     {{ data }}
     <div class="p-10">
       <n-button type="primary" @click="() =>showProductList = !showProductList">
-        Show Product List
+        v-if 切换产品列表
       </n-button>
       {{ props.orderId }}
       <n-card v-if="showProductList" title="产品列表">

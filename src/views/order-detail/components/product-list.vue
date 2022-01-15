@@ -25,7 +25,7 @@ onShowByDrawer((records) => {
 <template>
   {{ data }}
   <n-button type="primary" @click="productDetailDrawer.open()">
-    productDetailDrawer
+    产品详情抽屉
   </n-button>
 </template>
 

@@ -20,10 +20,10 @@ setTimeout(() => {
     {{ data }}
   </div>
   <n-button type="primary" @click="orderDetailDrawer.open({ props: { orderId: new Date().toLocaleString() } })">
-    orderDetailDrawer
+    订单详情
   </n-button>
   <n-button type="primary" @click="() => recordShowEvents('product-list')">
-    Change Product List
+    修改产品列表
   </n-button>
 </template>
 

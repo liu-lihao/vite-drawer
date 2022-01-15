@@ -22,11 +22,19 @@ const createShowEvents = () => {
     addEvent: (cb) => {
       obj.events.push(cb)
       return () => {
-        obj.events.splice(obj.events.indexOf(cb), 1)
+        const i = obj.events.indexOf(cb)
+        i !== -1 && obj.events.splice(i, 1)
       }
     },
     addRecords: (records) => {
-      Object.assign(obj.records, records || {})
+      records = { ...records }
+      for (const key in records) {
+        if (key in obj.records) {
+          obj.records[key] += records[key]
+          delete records[key]
+        }
+      }
+      Object.assign(obj.records, records)
     },
     clearRecords: () => {
       for (const k in obj.records) {
@@ -41,6 +49,7 @@ export const useDrawerContainer = (config: ContainerConfig) => {
   const isDrawerInner = useInject<boolean>(IS_DRAWER_INNER)
   const portal = isDrawerInner ? null : useDrawerPortal()
   const items = isDrawerInner ? useInject<Ref<DrawerItem[]>>(DRAWER_ITEMS)! : ref<DrawerItem[]>([])
+
   let currentItem: DrawerItem
 
   const baseShowEvents: ShowEvents = useInject(BASE_SHOW_EVENTS) || createShowEvents()
@@ -51,11 +60,11 @@ export const useDrawerContainer = (config: ContainerConfig) => {
 
   const createItem = (data: OpenConfig, beforeItem?: DrawerItem) => {
     const itemUid = uid++
-    const itemCmpName = `DrawerItem${itemUid}`
+    const cacheName = `DrawerItem${itemUid}`
     const showEvents = shallowRef(createShowEvents())
 
     const itemCmp = defineComponent({
-      name: itemCmpName,
+      name: cacheName,
       setup() {
         useProvide(ITEM_SHOW_EVENTS, showEvents.value)
         useProvide(BEFORE_SHOW_EVENTS, beforeItem?.showEvents || baseShowEvents)
@@ -82,10 +91,10 @@ export const useDrawerContainer = (config: ContainerConfig) => {
       onActive: null,
 
       // keepAlive 缓存相关
-      itemCmpName,
-      record: true,
-      removeRecord: null,
-      registerRemoveRecord: null,
+      cacheName,
+      cache: true,
+      removeCache: null,
+      registerRemoveCache: null,
 
       showEvents,
 
@@ -108,32 +117,32 @@ export const useDrawerContainer = (config: ContainerConfig) => {
 
     // 注册清除缓存函数
     let realRemoveRecord: any
-    item.registerRemoveRecord = (fn: any) => {
+    item.registerRemoveCache = (fn: any) => {
       realRemoveRecord = fn
     }
 
     // 清除缓存
-    item.removeRecord = () => {
-      item.record = false
+    item.removeCache = () => {
+      item.cache = false
       realRemoveRecord?.()
     }
 
     // 被渲染
     item.onActive = () => {
       items.value.forEach(n => n.active = false)
+      item.cache = true
       item.active = true
-      item.record = true
       item.showEvents.runEvents()
       // 执行完 onShow 后，将记录的 records 直接继承到下一层，并清空当前层级记录到 records
       inheritItemShowEvents()
       item.showEvents.clearRecords()
     }
 
-    // 关闭到统一入口
+    // 关闭的统一入口
     item.close = () => {
       const i = getIndex()
       // 减少冗余缓存
-      item.removeRecord()
+      item.removeCache()
       inheritItemShowEvents(i)
       items.value.splice(i, 1)
     }
@@ -143,7 +152,7 @@ export const useDrawerContainer = (config: ContainerConfig) => {
 
   const open = (data: OpenConfig = {}) => {
     if (!isDrawerInner) {
-      // 底层容器调用 open 时，不触发底层容器的 onShow、清除 showRecords
+      // 底层容器额外调用 open 时，不触发底层容器的 onShow、清除 showRecords
       openedPortalDestroy?.(false)
       openedPortalDestroy = (triggerShow = true) => {
         openedPortalDestroy = null
@@ -151,15 +160,21 @@ export const useDrawerContainer = (config: ContainerConfig) => {
           items.value[items.value.length - 1].close()
         }
         portal?.destroy?.()
-        triggerShow && baseShowEvents.runEvents()
-        triggerShow && baseShowEvents.clearRecords()
+        if (triggerShow) {
+          baseShowEvents.runEvents()
+          baseShowEvents.clearRecords()
+        }
       }
     }
+
     items.value.forEach((n) => {
-      n.originComponent === config.component && n.removeRecord()
+      n.originComponent === config.component && n.removeCache()
     })
+
     currentItem = createItem(data, items.value[items.value.length - 1])
+
     items.value.push(currentItem)
+
     if (!isDrawerInner) {
       portal?.create?.({
         items: items.value,
@@ -168,9 +183,13 @@ export const useDrawerContainer = (config: ContainerConfig) => {
     }
   }
 
-  // TODO 记录 open，一次性关闭
   const close = () => {
-    currentItem?.close?.()
+    if (isDrawerInner) {
+      currentItem?.close?.()
+    }
+    else {
+      openedPortalDestroy?.()
+    }
   }
 
   if (!isDrawerInner) {
@@ -179,7 +198,7 @@ export const useDrawerContainer = (config: ContainerConfig) => {
         openedPortalDestroy?.()
       }
     }, {
-      // 底层重复open的覆盖场景下，不能等到
+      // 底层重复open的覆盖场景下，清空 items，不能等到 push 后再执行
       flush: 'sync',
     })
   }
@@ -194,10 +213,10 @@ export const createUseDrawerContainer = (config: ContainerConfig) => () => useDr
 
 export const useIsDrawerInner = () => ({ isDrawerInner: useInject<boolean>(IS_DRAWER_INNER) })
 
-export const onShowByDrawer = (cb: ShowEvents['events']['0']) => {
+export const onShowByDrawer = (cb: ShowEvents['events'][0]) => {
   const showEvents = useInject<ShowEvents>(ITEM_SHOW_EVENTS) || useInject<ShowEvents>(BASE_SHOW_EVENTS)
   if (!showEvents) {
-    throw new Error('useDrawerContainer 必须在 onShowByDrawer 之前调用')
+    throw new Error('onShowByDrawer 必须在 useDrawerContainer 之后调用')
   }
   const removeCb = showEvents.addEvent(cb)
   onBeforeUnmount(() => removeCb())

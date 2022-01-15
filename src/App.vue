@@ -16,10 +16,10 @@ onShowByDrawer((records) => {
 
 <template>
   <n-button type="primary" @click="orderListDrawer.open()">
-    orderListDrawer
+    订单列表
   </n-button>
   <n-button type="primary" @click="customerDetailDrawer.open()">
-    customerDetailDrawer
+    客户详情
   </n-button>
 </template>
 
