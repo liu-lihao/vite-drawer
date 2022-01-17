@@ -8,7 +8,6 @@ import { createUseCreatePortal, useInject, useProvide } from '@/use'
 
 let uid = 0
 let openedPortalDestroy: any
-// let acitveEvents: Record<string, Record<string, any>>
 
 const useDrawerPortal = createUseCreatePortal(DrawerContainer)
 
@@ -45,12 +44,119 @@ const createShowEvents = () => {
   return obj
 }
 
+const createItem = ({
+  data,
+  items,
+  config,
+  beforeItem,
+  baseShowEvents,
+  onClose,
+}: {
+  data: OpenConfig
+  items: Ref<DrawerItem[]>
+  config: ContainerConfig
+  beforeItem?: DrawerItem
+  baseShowEvents: ShowEvents
+  onClose: () => void
+}) => {
+  const itemUid = uid++
+  const cacheName = `DrawerItem${itemUid}`
+  const showEvents = shallowRef(createShowEvents())
+
+  const itemCmp = defineComponent({
+    name: cacheName,
+    setup() {
+      useProvide(ITEM_SHOW_EVENTS, showEvents.value)
+      useProvide(BEFORE_SHOW_EVENTS, beforeItem?.showEvents || baseShowEvents)
+    },
+    render() {
+      return h(
+        config.component,
+        {
+          ...data.props,
+        },
+      )
+    },
+  })
+
+  const item = reactive<Record<keyof DrawerItem, any>>({
+    uid: itemUid,
+    name: data.name ?? config.name,
+    originComponent: shallowRef(config.component),
+    component: shallowRef(itemCmp),
+
+    // 激活态相关
+    active: true,
+    toActive: null,
+    onActive: null,
+
+    // keepAlive 缓存相关
+    cacheName,
+    cache: true,
+    removeCache: null,
+    registerRemoveCache: null,
+
+    showEvents,
+
+    close: null,
+  }) as DrawerItem
+
+  const getIndex = () => items.value.findIndex(n => n === item)
+
+  const inheritItemShowEvents = (i = getIndex()) => {
+    const showEvents = i ? items.value[i - 1]?.showEvents : baseShowEvents
+    showEvents.addRecords(item.showEvents.records)
+  }
+
+  // 直接激活自己
+  item.toActive = () => {
+    while (items.value[items.value.length - 1] !== item) {
+      items.value[items.value.length - 1].close()
+    }
+  }
+
+  // 注册清除缓存函数
+  let realRemoveRecord: any
+  item.registerRemoveCache = (fn: any) => {
+    realRemoveRecord = fn
+  }
+
+  // 清除缓存
+  item.removeCache = () => {
+    item.cache = false
+    realRemoveRecord?.()
+  }
+
+  // 被渲染
+  item.onActive = () => {
+    items.value.forEach(n => n.active = false)
+    item.cache = true
+    item.active = true
+    item.showEvents.runEvents()
+    // 执行完 onShow 后，将记录的 records 直接继承到下一层，并清空当前层级记录到 records
+    inheritItemShowEvents()
+    item.showEvents.clearRecords()
+  }
+
+  // 关闭的统一入口
+  item.close = () => {
+    const i = getIndex()
+    // 减少冗余缓存
+    item.removeCache()
+    inheritItemShowEvents(i)
+    items.value.splice(i, 1)
+    onClose()
+  }
+
+  return item as DrawerItem
+}
+
 export const useDrawerContainer = (config: ContainerConfig) => {
   const isDrawerInner = useInject<boolean>(IS_DRAWER_INNER)
   const portal = isDrawerInner ? null : useDrawerPortal()
   const items = isDrawerInner ? useInject<Ref<DrawerItem[]>>(DRAWER_ITEMS)! : ref<DrawerItem[]>([])
 
-  let currentItem: DrawerItem
+  let currentItem: DrawerItem | null
 
   const baseShowEvents: ShowEvents = useInject(BASE_SHOW_EVENTS) || createShowEvents()
 
@@ -58,103 +164,12 @@ export const useDrawerContainer = (config: ContainerConfig) => {
     useProvide(BASE_SHOW_EVENTS, baseShowEvents)
   }
 
-  const createItem = (data: OpenConfig, beforeItem?: DrawerItem) => {
-    const itemUid = uid++
-    const cacheName = `DrawerItem${itemUid}`
-    const showEvents = shallowRef(createShowEvents())
-
-    const itemCmp = defineComponent({
-      name: cacheName,
-      setup() {
-        useProvide(ITEM_SHOW_EVENTS, showEvents.value)
-        useProvide(BEFORE_SHOW_EVENTS, beforeItem?.showEvents || baseShowEvents)
-      },
-      render() {
-        return h(
-          config.component,
-          {
-            ...data.props,
-          },
-        )
-      },
-    })
-
-    const item = reactive<Record<keyof DrawerItem, any>>({
-      uid: itemUid,
-      name: data.name ?? config.name,
-      originComponent: shallowRef(config.component),
-      component: shallowRef(itemCmp),
-
-      // 激活态相关
-      active: true,
-      toActive: null,
-      onActive: null,
-
-      // keepAlive 缓存相关
-      cacheName,
-      cache: true,
-      removeCache: null,
-      registerRemoveCache: null,
-
-      showEvents,
-
-      close: null,
-    }) as DrawerItem
-
-    const getIndex = () => items.value.findIndex(n => n === item)
-
-    const inheritItemShowEvents = (i = getIndex()) => {
-      const showEvents = i ? items.value[i - 1]?.showEvents : baseShowEvents
-      showEvents.addRecords(item.showEvents.records)
-    }
-
-    // 直接激活自己
-    item.toActive = () => {
-      while (items.value[items.value.length - 1] !== item) {
-        items.value[items.value.length - 1].close()
-      }
-    }
-
-    // 注册清除缓存函数
-    let realRemoveRecord: any
-    item.registerRemoveCache = (fn: any) => {
-      realRemoveRecord = fn
-    }
-
-    // 清除缓存
-    item.removeCache = () => {
-      item.cache = false
-      realRemoveRecord?.()
-    }
-
-    // 被渲染
-    item.onActive = () => {
-      items.value.forEach(n => n.active = false)
-      item.cache = true
-      item.active = true
-      item.showEvents.runEvents()
-      // 执行完 onShow 后，将记录的 records 直接继承到下一层，并清空当前层级记录到 records
-      inheritItemShowEvents()
-      item.showEvents.clearRecords()
-    }
-
-    // 关闭的统一入口
-    item.close = () => {
-      const i = getIndex()
-      // 减少冗余缓存
-      item.removeCache()
-      inheritItemShowEvents(i)
-      items.value.splice(i, 1)
-    }
-
-    return item as DrawerItem
-  }
-
   const open = (data: OpenConfig = {}) => {
     if (!isDrawerInner) {
       // 底层容器额外调用 open 时，不触发底层容器的 onShow、清除 showRecords
       openedPortalDestroy?.(false)
       openedPortalDestroy = (triggerShow = true) => {
+        currentItem = null
         openedPortalDestroy = null
         while (items.value.length) {
           items.value[items.value.length - 1].close()
@@ -171,7 +186,16 @@ export const useDrawerContainer = (config: ContainerConfig) => {
       n.originComponent === config.component && n.removeCache()
     })
 
-    currentItem = createItem(data, items.value[items.value.length - 1])
+    currentItem = createItem({
+      data,
+      items,
+      config,
+      beforeItem: items.value[items.value.length - 1],
+      baseShowEvents,
+      onClose() {
+        currentItem = null
+      },
+    })
 
     items.value.push(currentItem)
 
