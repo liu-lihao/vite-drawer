@@ -56,7 +56,7 @@ const createItem = ({
   items: Ref<DrawerItem[]>
   config: ContainerConfig
   beforeItem?: DrawerItem
-  baseShowEvents: ShowEvents
+  baseShowEvents?: ShowEvents | null
   onClose: () => void
 }) => {
   const itemUid = uid++
@@ -105,7 +105,7 @@ const createItem = ({
 
   const inheritItemShowEvents = (i = getIndex()) => {
     const showEvents = i ? items.value[i - 1]?.showEvents : baseShowEvents
-    showEvents.addRecords(item.showEvents.records)
+    showEvents?.addRecords(item.showEvents.records)
   }
 
   // 直接激活自己
@@ -153,19 +153,21 @@ const createItem = ({
 
 export const useDrawerContainer = (config: ContainerConfig) => {
   const isDrawerInner = useInject<boolean>(IS_DRAWER_INNER)
+
   const portal = isDrawerInner ? null : useDrawerPortal()
   const items = isDrawerInner ? useInject<Ref<DrawerItem[]>>(DRAWER_ITEMS)! : ref<DrawerItem[]>([])
+  const baseShowEvents: ShowEvents | null = isDrawerInner ? null : (useInject(BASE_SHOW_EVENTS) || createShowEvents())
 
   let currentItem: DrawerItem | null
-
-  const baseShowEvents: ShowEvents = useInject(BASE_SHOW_EVENTS) || createShowEvents()
 
   if (!isDrawerInner) {
     useProvide(BASE_SHOW_EVENTS, baseShowEvents)
   }
 
   const open = (data: OpenConfig = {}) => {
+    // 无论底层、栈内，重复 open，都关闭上一次的 open
     if (!isDrawerInner) {
+      // 这里处理底层
       // 底层容器额外调用 open 时，不触发底层容器的 onShow、清除 showRecords
       openedPortalDestroy?.(false)
       openedPortalDestroy = (triggerShow = true) => {
@@ -176,10 +178,14 @@ export const useDrawerContainer = (config: ContainerConfig) => {
         }
         portal?.destroy?.()
         if (triggerShow) {
-          baseShowEvents.runEvents()
-          baseShowEvents.clearRecords()
+          baseShowEvents?.runEvents()
+          baseShowEvents?.clearRecords()
         }
       }
+    }
+    else {
+      // 这里处理栈内的情况
+      currentItem?.close?.()
     }
 
     items.value.forEach((n) => {
@@ -253,7 +259,7 @@ export const useRecordShowEvents = () => {
       if (!showEvents) return
       if (!showEvents.records) showEvents.records = {}
       if (!showEvents.records[key]) showEvents.records[key] = 0
-      showEvents.records[key] += 1
+      showEvents.records[key] = +1
     },
   }
 }
